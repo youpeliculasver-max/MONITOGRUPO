@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TeleQoS Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>TeleQoS Monitor</h1>
+    <p>Sistema web para evaluar la calidad de internet en redes WiFi, 4G y 5G</p>
+  </header>
+
+  <main class="contenedor">
+    <section class="card principal">
+      <h2>Diagnóstico de red</h2>
+      <p>Presiona el botón para medir latencia, jitter y velocidad estimada de descarga.</p>
+      <button id="btnIniciar" onclick="iniciarDiagnostico()">Iniciar diagnóstico</button>
+      <div id="estadoPrueba" class="estado">Esperando inicio de prueba...</div>
+    </section>
+
+    <section class="resultados">
+      <div class="card">
+        <h3>Latencia</h3>
+        <p id="latencia">-- ms</p>
+        <span>Tiempo de respuesta de la red</span>
+      </div>
+
+      <div class="card">
+        <h3>Jitter</h3>
+        <p id="jitter">-- ms</p>
+        <span>Variación de la latencia</span>
+      </div>
+
+      <div class="card">
+        <h3>Velocidad</h3>
+        <p id="velocidad">-- Mbps</p>
+        <span>Velocidad estimada de descarga</span>
+      </div>
+    </section>
+
+    <section class="card diagnostico">
+      <h2>Resultado final</h2>
+      <div id="semaforo" class="semaforo gris"></div>
+      <h3 id="estadoRed">Sin diagnóstico</h3>
+      <p id="recomendacion">Ejecuta una prueba para conocer la calidad de tu conexión.</p>
+
+      <div class="barra-contenedor">
+        <div id="barraCalidad" class="barra"></div>
+      </div>
+      <p id="porcentajeCalidad">Calidad: --%</p>
+    </section>
+
+    <section class="card">
+      <h2>Historial de pruebas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Latencia</th>
+            <th>Jitter</th>
+            <th>Velocidad</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tablaHistorial"></tbody>
+      </table>
+
+      <button class="btn-secundario" onclick="borrarHistorial()">Borrar historial</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>Proyecto académico de telecomunicaciones - Calidad de Servicio QoS</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
