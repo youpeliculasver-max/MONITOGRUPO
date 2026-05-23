@@ -109,8 +109,8 @@ async function medirVelocidad() {
 function clasificarRed(latencia, jitter, velocidad) {
   let puntos = 100;
 
-  if (latencia > 100) puntos -= 2O;
-  if (latencia > 200) puntos -= 3O;
+  if (latencia > 100) puntos -= 20;
+  if (latencia > 200) puntos -= 30;
 
   if (jitter > 3O) puntos -= 20;
   if (jitter > 50) puntos -= 20;
