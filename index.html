@@ -10,14 +10,14 @@
 </head>
 <body class="dark-theme">
 
-  <!-- Modal de Inicio de Sesión / Invitado -->
+  <!-- Modal de Inicio de Sesión / Registro -->
   <div id="loginModal" class="modal-overlay">
     <div class="modal-content">
-      <h2>Identificación de Sesión</h2>
-      <p>Ingresa un usuario para guardar tus mediciones localmente, o continúa de forma anónima (no guarda historial).</p>
-      <input type="text" id="inputUsuario" placeholder="Ej: Analista_Core" autocomplete="off" />
+      <h2>Control de Acceso</h2>
+      <p>Ingresa un usuario para registrar tus mediciones, o continúa como invitado (no guarda historial).</p>
+      <input type="text" id="inputUsuario" placeholder="Ej: Ingeniera_Core" autocomplete="off" />
       <div class="modal-botones">
-        <button onclick="iniciarSesion(true)">Ingresar</button>
+        <button onclick="iniciarSesion(true)">Ingresar / Registrarse</button>
         <button class="btn-secundario" onclick="iniciarSesion(false)">Modo Invitado</button>
       </div>
     </div>
@@ -31,7 +31,7 @@
     </div>
   </header>
 
-  <!-- Contenedor principal (Oculto hasta que se inicie sesión) -->
+  <!-- Contenedor principal (Oculto hasta autenticarse) -->
   <main class="contenedor" id="mainContent" style="display: none;">
     
     <!-- Panel de Control -->
@@ -79,8 +79,7 @@
       <div class="data-controls">
         <button class="btn-accion" id="btnExportar" onclick="exportarCSV()">Exportar CSV</button>
         
-        <!-- Botón para importar CSV -->
-        <label for="importarCSV" class="btn-accion btn-importar">Importar y Analizar CSV</label>
+        <label for="importarCSV" class="btn-accion btn-importar">Importar CSV</label>
         <input type="file" id="importarCSV" accept=".csv" onchange="procesarCSV(event)" style="display: none;" />
         
         <button class="btn-secundario" id="btnBorrar" onclick="borrarHistorial()">Limpiar Datos</button>
