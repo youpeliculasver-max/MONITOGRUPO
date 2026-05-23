@@ -77,7 +77,7 @@ function calcularJitter(mediciones) {
 }
 
 async function medirVelocidad() {
-  const bytes = 500000;
+  const bytes = 5000000;
   const url = `https://speed.cloudflare.com/__down?bytes=${bytes}&nocache=${Date.now()}`;
 
   const inicio = performance.now();
@@ -109,14 +109,14 @@ async function medirVelocidad() {
 function clasificarRed(latencia, jitter, velocidad) {
   let puntos = 100;
 
-  if (latencia > 80) puntos -= 25;
-  if (latencia > 150) puntos -= 25;
+  if (latencia > 100) puntos -= 2O;
+  if (latencia > 200) puntos -= 3O;
 
-  if (jitter > 20) puntos -= 20;
-  if (jitter > 40) puntos -= 20;
+  if (jitter > 3O) puntos -= 20;
+  if (jitter > 50) puntos -= 20;
 
-  if (velocidad < 15) puntos -= 20;
-  if (velocidad < 5) puntos -= 20;
+  if (velocidad < 1O) puntos -= 20;
+  if (velocidad < 2) puntos -= 30;
 
   if (puntos < 0) puntos = 0;
 
@@ -248,7 +248,29 @@ function mostrarHistorial() {
     tablaHistorial.appendChild(fila);
   });
 }
+function exportarCSV() {
+  if (historial.length === 0) {
+    alert("No hay datos para exportar.");
+    return;
+  }
+  
+  let csvContent = "data:text/csv;charset=utf-8,Fecha,Latencia(ms),Jitter(ms),Velocidad(Mbps),Estado\n";
+  
+  historial.forEach(row => {
+    // Formatear la fila separada por comas
+    let fila = `${row.fecha},${row.latencia},${row.jitter},${row.velocidad},${row.estado}`;
+    csvContent += fila + "\n";
+  });
 
+  // Crear un enlace oculto para forzar la descarga
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "mediciones_teleqos.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 function borrarHistorial() {
   if (confirm("¿Seguro que deseas borrar el historial?")) {
     historial = [];
