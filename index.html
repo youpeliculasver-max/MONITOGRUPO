@@ -1,104 +1,108 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VELOCÍMETRO</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VELOCÍMETRO</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Librería externa para generar el gráfico de estabilidad -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="dark-theme">
 
-    <!-- Modal de Acceso -->
-    <div id="loginModal" class="modal-overlay">
-        <div class="modal-content">
-            <h2>Control de Acceso</h2>
-            <p>Ingresa un nombre para registrar tus mediciones, o accede como invitado (no se guardará historial).</p>
-            <input type="text" id="inputUsuario" placeholder="Tu nombre de perfil" autocomplete="off" />
-            <div class="modal-botones">
-                <button id="btnIngresar">Ingresar / Registrarse</button>
-                <button id="btnInvitado" class="btn-secundario">Modo Invitado</button>
-            </div>
-        </div>
+  <!-- Modal de Inicio de Sesión / Invitado -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2>Identificación de Sesión</h2>
+      <p>Ingresa un usuario para guardar tus mediciones localmente, o continúa de forma anónima (no guarda historial).</p>
+      <input type="text" id="inputUsuario" placeholder="Ej: Analista_Core" autocomplete="off" />
+      <div class="modal-botones">
+        <button onclick="iniciarSesion(true)">Ingresar</button>
+        <button class="btn-secundario" onclick="iniciarSesion(false)">Modo Invitado</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Panel principal (oculto hasta iniciar sesión) -->
-    <main id="mainContent" class="contenedor" style="display: none;">
-        <header>
-            <h1>VELOCÍMETRO</h1>
-            <div class="user-info">
-                <span id="usuarioActivo">Sesión: Pendiente</span>
-                <button id="btnSalir" class="btn-small btn-secundario">Salir</button>
-            </div>
-        </header>
+  <header>
+    <h1>VELOCÍMETRO</h1>
+    <div class="user-info">
+      <span id="usuarioActivo">Sesión: Pendiente</span>
+      <button id="btnSalir" class="btn-small btn-secundario" style="display: none;" onclick="cerrarSesion()">Salir</button>
+    </div>
+  </header>
 
-        <!-- Panel de Control -->
-        <section class="card panel-control text-center">
-            <h2>Monitor de Enlace</h2>
-            <button id="btnIniciar">Iniciar Medición</button>
-            <div id="estadoPrueba" class="estado">Esperando comando...</div>
-            <div id="progressContainer" class="progress-container hidden">
-                <div id="progressBar" class="progress-bar"></div>
-            </div>
-        </section>
+  <!-- Contenedor principal (Oculto hasta que se inicie sesión) -->
+  <main class="contenedor" id="mainContent" style="display: none;">
+    
+    <!-- Panel de Control -->
+    <section class="card panel-control text-center">
+      <h2>Monitor de Enlace</h2>
+      <button id="btnIniciar" onclick="iniciarDiagnostico()">Iniciar Medición</button>
+      <div id="estadoPrueba" class="estado">Esperando comando...</div>
+    </section>
 
-        <!-- Métricas -->
-        <section class="resultados">
-            <div class="card metric">
-                <h3>Latencia</h3>
-                <p id="latencia">-- ms</p>
-            </div>
-            <div class="card metric">
-                <h3>Jitter</h3>
-                <p id="jitter">-- ms</p>
-            </div>
-            <div class="card metric">
-                <h3>Velocidad</h3>
-                <p id="velocidad">-- Mbps</p>
-            </div>
-        </section>
+    <!-- Métricas en Tiempo Real -->
+    <section class="resultados">
+      <div class="card metric">
+        <h3>Latencia</h3>
+        <p id="latencia">-- ms</p>
+      </div>
+      <div class="card metric">
+        <h3>Jitter</h3>
+        <p id="jitter">-- ms</p>
+      </div>
+      <div class="card metric">
+        <h3>Velocidad</h3>
+        <p id="velocidad">-- Mbps</p>
+      </div>
+    </section>
 
-        <!-- Indicador Visual -->
-        <section class="card diagnostico text-center">
-            <h2>Evaluación QoS</h2>
-            <div id="semaforo" class="semaforo gris"></div>
-            <h3 id="estadoRed">Standby</h3>
-            <p id="recomendacion">Parámetros en espera de medición.</p>
-            <div id="barraCalidad" class="quality-bar-bg hidden">
-                <div id="barraFill" class="quality-bar-fill"></div>
-            </div>
-            <p id="porcentajeCalidad"></p>
-        </section>
+    <!-- Indicador Visual (Semáforo Neón) -->
+    <section class="card diagnostico text-center">
+      <h2>Evaluación QoS</h2>
+      <div id="semaforo" class="semaforo gris"></div>
+      <h3 id="estadoRed">Standby</h3>
+      <p id="recomendacion">Parámetros en espera de medición.</p>
+    </section>
 
-        <!-- Gráfico -->
-        <section class="card">
-            <h2>Evolución de Estabilidad</h2>
-            <div class="canvas-container">
-                <canvas id="graficoEstabilidad" height="80"></canvas>
-            </div>
-        </section>
+    <!-- Gráfico Dinámico -->
+    <section class="card">
+      <h2>Evolución de Estabilidad</h2>
+      <div class="canvas-container">
+        <canvas id="graficoEstabilidad" height="80"></canvas>
+      </div>
+    </section>
 
-        <!-- Historial y CSV -->
-        <section class="card">
-            <h2>Registro Histórico</h2>
-            <div class="data-controls">
-                <button id="btnExportar" class="btn-accion">Exportar CSV</button>
-                <label for="importarCSV" class="btn-accion btn-importar">Importar CSV</label>
-                <input type="file" id="importarCSV" accept=".csv" style="display: none;" />
-                <button id="btnBorrar" class="btn-secundario">Limpiar Datos</button>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr><th>Fecha</th><th>Latencia</th><th>Jitter</th><th>Velocidad</th><th>Análisis</th></tr>
-                    </thead>
-                    <tbody id="tablaHistorial"></tbody>
-                </table>
-            </div>
-            <div id="csvAnalysisContainer" class="csv-analysis hidden"></div>
-        </section>
-    </main>
+    <!-- Gestión de Datos e Historial -->
+    <section class="card">
+      <h2>Registro Histórico</h2>
+      <div class="data-controls">
+        <button class="btn-accion" id="btnExportar" onclick="exportarCSV()">Exportar CSV</button>
+        
+        <!-- Botón para importar CSV -->
+        <label for="importarCSV" class="btn-accion btn-importar">Importar y Analizar CSV</label>
+        <input type="file" id="importarCSV" accept=".csv" onchange="procesarCSV(event)" style="display: none;" />
+        
+        <button class="btn-secundario" id="btnBorrar" onclick="borrarHistorial()">Limpiar Datos</button>
+      </div>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Latencia</th>
+              <th>Jitter</th>
+              <th>Velocidad</th>
+              <th>Análisis QoS</th>
+            </tr>
+          </thead>
+          <tbody id="tablaHistorial"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-    <script src="script.js" defer></script>
+  <script src="script.js"></script>
 </body>
 </html>
