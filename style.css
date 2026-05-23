@@ -1,211 +1,344 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VELOCÍMETRO | Diagnóstico de Internet</title>
 
-body.dark-theme {
-  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
-  background-color: #0f172a; /* Fondo azul muy oscuro */
-  color: #f8fafc; /* Texto claro */
-}
+  <link rel="stylesheet" href="style.css" />
 
-/* --- CABECERA --- */
-header {
-  background: #1e293b;
-  padding: 20px 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #334155;
-}
+  <!-- Gráficos profesionales -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 
-header h1 {
-  font-size: 28px;
-  letter-spacing: 2px;
-  color: #38bdf8;
-}
+<body>
+  <!-- MODAL DE INGRESO -->
+  <div id="modalAcceso" class="modal-acceso">
+    <div class="modal-card">
+      <div class="modal-icono">⚡</div>
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-size: 14px;
-  color: #94a3b8;
-}
+      <h1>VELOCÍMETRO</h1>
+      <p>
+        Diagnostica la calidad de tu internet, analiza tus mediciones
+        y guarda tu historial de pruebas.
+      </p>
 
-/* --- MODAL DE SESIÓN --- */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
+      <div class="opciones-acceso">
+        <button onclick="entrarComoInvitado()" class="btn-outline">
+          Entrar como invitado
+        </button>
 
-.modal-content {
-  background: #1e293b;
-  padding: 30px;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 400px;
-  text-align: center;
-  border: 1px solid #334155;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-}
+        <div class="separador">
+          <span>o</span>
+        </div>
 
-.modal-content h2 { margin-bottom: 15px; color: #f8fafc; }
-.modal-content p { font-size: 14px; color: #94a3b8; margin-bottom: 20px; }
-.modal-content input {
-  width: 100%; padding: 12px; margin-bottom: 20px;
-  border-radius: 6px; border: 1px solid #475569;
-  background: #0f172a; color: white;
-}
+        <input
+          type="text"
+          id="nombreUsuario"
+          placeholder="Escribe tu nombre de usuario"
+          autocomplete="off"
+        />
 
-.modal-botones {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
+        <button onclick="entrarConUsuario()" class="btn-principal">
+          Entrar con usuario
+        </button>
+      </div>
 
-/* --- CONTENEDOR PRINCIPAL Y TARJETAS --- */
-.contenedor {
-  width: 95%;
-  max-width: 1100px;
-  margin: 30px auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+      <small>
+        Invitado: no guarda historial. Usuario: guarda las mediciones en este navegador.
+      </small>
+    </div>
+  </div>
 
-.card {
-  background: #1e293b;
-  padding: 24px;
-  border-radius: 12px;
-  border: 1px solid #334155;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-}
+  <!-- CONTENIDO PRINCIPAL -->
+  <div id="app" class="app oculto">
 
-.text-center { text-align: center; }
-.card h2 { margin-bottom: 20px; font-size: 20px; color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icono">⚡</div>
+        <div>
+          <h2>VELOCÍMETRO</h2>
+          <span>Panel de diagnóstico</span>
+        </div>
+      </div>
 
-/* --- BOTONES --- */
-button, .btn-importar {
-  border: none;
-  background: #2563eb;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s;
-  display: inline-block;
-}
+      <nav>
+        <a href="#diagnostico" class="activo">Diagnóstico</a>
+        <a href="#resultados">Resultados</a>
+        <a href="#paginas">Uso por página</a>
+        <a href="#historial">Historial</a>
+        <a href="#csv">Importar CSV</a>
+      </nav>
 
-button:hover, .btn-importar:hover { background: #1d4ed8; }
-button:disabled { background: #475569; cursor: not-allowed; color: #94a3b8; }
+      <div class="usuario-box">
+        <span>Sesión actual</span>
+        <strong id="usuarioActual">Invitado</strong>
+        <button onclick="cerrarSesion()">Cambiar usuario</button>
+      </div>
+    </aside>
 
-.btn-secundario { background: #dc2626; }
-.btn-secundario:hover { background: #b91c1c; }
-.btn-small { padding: 8px 12px; font-size: 13px; }
-.btn-importar { background: #10b981; } /* Verde para importar */
-.btn-importar:hover { background: #059669; }
+    <!-- DASHBOARD -->
+    <main class="dashboard">
 
-.data-controls {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
+      <!-- ENCABEZADO -->
+      <header class="topbar">
+        <div>
+          <h1>VELOCÍMETRO</h1>
+          <p>Centro de medición, estabilidad y análisis de conexión.</p>
+        </div>
 
-/* --- MÉTRICAS --- */
-.resultados {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
+        <div class="estado-sistema">
+          <span class="punto-online"></span>
+          Sistema activo
+        </div>
+      </header>
 
-.metric h3 { color: #94a3b8; font-size: 16px; margin-bottom: 10px; }
-.metric p { font-size: 36px; font-weight: bold; color: #38bdf8; }
+      <!-- TARJETA PRINCIPAL -->
+      <section id="diagnostico" class="panel hero-panel">
+        <div class="hero-texto">
+          <span class="etiqueta">Prueba en tiempo real</span>
+          <h2>Medición general de internet</h2>
+          <p>
+            Ejecuta una prueba para obtener latencia, jitter, velocidad estimada,
+            calidad del enlace y recomendación de uso.
+          </p>
 
-.estado {
-  margin-top: 15px; padding: 10px; background: #0f172a;
-  border-radius: 6px; font-family: monospace; color: #10b981;
-}
+          <div class="acciones">
+            <button id="btnIniciar" onclick="iniciarDiagnostico()" class="btn-principal grande">
+              Iniciar medición
+            </button>
 
-/* --- INDICADOR NEÓN (SEMÁFORO) --- */
-.diagnostico {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+            <button onclick="copiarResultado()" class="btn-outline">
+              Copiar resultado
+            </button>
+          </div>
 
-.semaforo {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  margin: 20px 0;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-  position: relative;
-  box-shadow: inset 0 0 15px rgba(0,0,0,0.4); 
-}
+          <div id="estadoPrueba" class="estado-prueba">
+            Esperando inicio de medición...
+          </div>
+        </div>
 
-.gris {
-  background: #334155;
-  box-shadow: 0 0 5px rgba(255,255,255,0.1);
-}
+        <div class="medidor-box">
+          <div id="semaforo" class="semaforo gris"></div>
+          <h3 id="estadoRed">Sin diagnóstico</h3>
+          <p id="recomendacion">
+            Ejecuta una medición para conocer la calidad de tu conexión.
+          </p>
 
-.verde {
-  background: #22c55e;
-  box-shadow: 0 0 10px #fff, 0 0 20px #22c55e, 0 0 40px rgba(34,197,94,0.6);
-}
+          <div class="barra-contenedor">
+            <div id="barraCalidad" class="barra"></div>
+          </div>
 
-.amarillo {
-  background: #eab308;
-  box-shadow: 0 0 10px #fff, 0 0 20px #eab308, 0 0 40px rgba(234,179,8,0.6);
-}
+          <strong id="porcentajeCalidad">Calidad: --%</strong>
+        </div>
+      </section>
 
-.rojo {
-  background: #ef4444;
-  box-shadow: 0 0 10px #fff, 0 0 20px #ef4444, 0 0 40px rgba(239,68,68,0.6);
-}
+      <!-- RESULTADOS -->
+      <section id="resultados" class="grid-resultados">
+        <article class="metric-card">
+          <div class="metric-header">
+            <span>Latencia</span>
+            <small>ms</small>
+          </div>
+          <h2 id="latencia">--</h2>
+          <p>Tiempo de respuesta de la red.</p>
+        </article>
 
-#estadoRed { margin: 10px 0; font-size: 22px; }
-#recomendacion { color: #94a3b8; max-width: 600px; margin: 0 auto; }
+        <article class="metric-card">
+          <div class="metric-header">
+            <span>Jitter</span>
+            <small>ms</small>
+          </div>
+          <h2 id="jitter">--</h2>
+          <p>Variación entre mediciones de latencia.</p>
+        </article>
 
-/* --- GRÁFICO Y TABLA --- */
-.canvas-container {
-  width: 100%;
-  background: #0f172a;
-  padding: 10px;
-  border-radius: 8px;
-}
+        <article class="metric-card">
+          <div class="metric-header">
+            <span>Velocidad</span>
+            <small>Mbps</small>
+          </div>
+          <h2 id="velocidad">--</h2>
+          <p>Velocidad estimada de descarga.</p>
+        </article>
 
-.table-container {
-  width: 100%;
-  overflow-x: auto;
-}
+        <article class="metric-card">
+          <div class="metric-header">
+            <span>Uso recomendado</span>
+            <small>QoS</small>
+          </div>
+          <h2 id="usoRecomendado">--</h2>
+          <p>Actividad sugerida según la calidad medida.</p>
+        </article>
+      </section>
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
+      <!-- ANÁLISIS POR PÁGINA -->
+      <section id="paginas" class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="etiqueta">Análisis por sitio</span>
+            <h2>Estimador de uso por página</h2>
+          </div>
+        </div>
 
-th, td {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid #334155;
-}
+        <div class="alerta-info">
+          Por seguridad del navegador, una web no puede medir el consumo real de otras pestañas.
+          Esta sección analiza el consumo estimado según el tipo de página o actividad ingresada.
+        </div>
 
-th { background: #0f172a; color: #38bdf8; font-weight: 600; }
-tr:hover { background: #0f172a; }
+        <div class="form-grid">
+          <div class="campo">
+            <label for="urlPagina">Página o servicio</label>
+            <input
+              type="text"
+              id="urlPagina"
+              placeholder="Ejemplo: YouTube, Zoom, Netflix, Aula virtual"
+            />
+          </div>
 
-/* --- RESPONSIVIDAD --- */
-@media (max-width: 768px) {
-  header { flex-direction: column; gap: 10px; }
-  .data-controls { justify-content: center; }
-}
+          <div class="campo">
+            <label for="tipoActividad">Tipo de uso</label>
+            <select id="tipoActividad">
+              <option value="navegacion">Navegación web</option>
+              <option value="clase">Clase virtual</option>
+              <option value="videollamada">Videollamada</option>
+              <option value="streaming">Streaming de video</option>
+              <option value="juegos">Juegos en línea</option>
+              <option value="descarga">Descarga de archivos</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="tiempoUso">Tiempo de uso aproximado</label>
+            <select id="tiempoUso">
+              <option value="15">15 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="60">1 hora</option>
+              <option value="120">2 horas</option>
+              <option value="180">3 horas</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="analizarUsoPagina()" class="btn-principal">
+          Analizar página
+        </button>
+
+        <div id="resultadoPagina" class="resultado-pagina">
+          Ingresa una página o servicio para estimar si tu conexión es adecuada.
+        </div>
+      </section>
+
+      <!-- GRÁFICO -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="etiqueta">Estabilidad</span>
+            <h2>Gráfico de evolución</h2>
+          </div>
+        </div>
+
+        <div class="grafico-box">
+          <canvas id="graficoHistorial"></canvas>
+        </div>
+      </section>
+
+      <!-- HISTORIAL -->
+      <section id="historial" class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="etiqueta">Registro local</span>
+            <h2>Historial de mediciones</h2>
+          </div>
+
+          <div class="acciones">
+            <button onclick="exportarCSV()" class="btn-outline">
+              Exportar CSV
+            </button>
+
+            <button onclick="borrarHistorial()" class="btn-danger">
+              Borrar historial
+            </button>
+          </div>
+        </div>
+
+        <div class="tabla-contenedor">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Latencia</th>
+                <th>Jitter</th>
+                <th>Velocidad</th>
+                <th>Calidad</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tablaHistorial">
+              <tr>
+                <td colspan="7">Todavía no hay mediciones registradas.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- IMPORTAR CSV -->
+      <section id="csv" class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="etiqueta">Análisis externo</span>
+            <h2>Importar y analizar CSV</h2>
+          </div>
+        </div>
+
+        <p class="texto-panel">
+          Sube un archivo CSV con mediciones anteriores para analizar si la conexión
+          sirve para navegación, clases virtuales, videollamadas, streaming o juegos.
+        </p>
+
+        <div class="import-box">
+          <input
+            type="file"
+            id="archivoCSV"
+            accept=".csv"
+            onchange="importarCSV(event)"
+          />
+
+          <label for="archivoCSV">
+            Seleccionar archivo CSV
+          </label>
+        </div>
+
+        <div id="resultadoCSV" class="resultado-csv">
+          Aún no se ha importado ningún archivo.
+        </div>
+      </section>
+
+      <!-- FUNCIÓN EXTRA -->
+      <section class="panel recomendaciones-panel">
+        <div>
+          <span class="etiqueta">Diagnóstico inteligente</span>
+          <h2>Interpretación rápida</h2>
+          <p id="interpretacionFinal">
+            Cuando realices una medición, aquí aparecerá una interpretación más clara
+            sobre para qué actividades sirve tu conexión.
+          </p>
+        </div>
+
+        <div class="chips">
+          <span id="chipNavegacion">Navegación</span>
+          <span id="chipClases">Clases virtuales</span>
+          <span id="chipStreaming">Streaming</span>
+          <span id="chipJuegos">Juegos online</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
