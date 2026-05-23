@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VELOCÍMETRO LTE/EPC</title>
+  <title>VELOCÍMETRO</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -13,7 +13,7 @@
     <div class="modal-content">
       <h2>Control de Acceso</h2>
       <p>Ingresa tus credenciales para registrar mediciones, o continúa como invitado.</p>
-      <input type="text" id="inputUsuario" placeholder="Usuario (Ej: Analista_NOC)" autocomplete="off" />
+      <input type="text" id="inputUsuario" placeholder="Usuario" autocomplete="off" />
       <input type="password" id="inputPassword" placeholder="Contraseña" autocomplete="off" />
       <div class="modal-botones">
         <button onclick="iniciarSesion(true)">Ingresar / Registrar</button>
@@ -22,39 +22,15 @@
     </div>
   </div>
 
-  <div id="historialModal" class="modal-overlay" style="display: none;">
-    <div class="modal-content historial-content">
-      <div class="historial-header">
-        <h2>Mediciones Guardadas</h2>
-        <button class="btn-secundario btn-small" onclick="cerrarHistorial()">Cerrar Ventana</button>
-      </div>
+  <div id="modalListadoHistoriales" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2>Tus Historiales Guardados</h2>
+      <p>Selecciona un historial para cargarlo en la pantalla principal.</p>
       
-      <div class="canvas-container">
-        <canvas id="graficoEstabilidad" height="80"></canvas>
-      </div>
-
-      <div class="data-controls">
-        <button class="btn-accion" onclick="descargarGrafico()">Descargar Gráfico (PNG)</button>
-        <button class="btn-accion" onclick="exportarCSV()">Exportar CSV</button>
-        <label for="importarCSV" class="btn-accion btn-importar">Importar CSV</label>
-        <input type="file" id="importarCSV" accept=".csv" onchange="procesarCSV(event)" style="display: none;" />
-        <button class="btn-secundario" onclick="borrarHistorial()">Limpiar Datos</button>
-      </div>
+      <div id="contenedorListaHistoriales" style="margin-top: 20px; max-height: 300px; overflow-y: auto;">
+        </div>
       
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha y Hora</th>
-              <th>Latencia</th>
-              <th>Jitter</th>
-              <th>Velocidad</th>
-              <th>Análisis QoS</th>
-            </tr>
-          </thead>
-          <tbody id="tablaHistorial"></tbody>
-        </table>
-      </div>
+      <button class="btn-secundario" style="margin-top: 20px; width: 100%;" onclick="cerrarVentanaHistoriales()">Cerrar Ventana</button>
     </div>
   </div>
 
@@ -62,8 +38,7 @@
     <h1>VELOCÍMETRO</h1>
     <div class="user-info">
       <span id="usuarioActivo">Sesión: Pendiente</span>
-      <button id="btnVerHistorial" class="btn-importar btn-small" style="display: none;" onclick="abrirHistorial()">Historial Guardado</button>
-      <button id="btnSalir" class="btn-secundario btn-small" style="display: none;" onclick="cerrarSesion()">Salir</button>
+      <button id="btnSalir" class="btn-small btn-secundario" style="display: none;" onclick="cerrarSesion()">Salir</button>
     </div>
   </header>
 
@@ -96,7 +71,44 @@
       <h3 id="estadoRed">Standby</h3>
       <p id="recomendacion">Parámetros en espera de medición.</p>
       
-      <button id="btnGuardar" class="btn-importar" style="display: none; margin-top: 20px; font-size: 18px;" onclick="guardarMedicionActual()">💾 Guardar esta Medición</button>
+      <div class="data-controls" style="justify-content: center; margin-top: 20px;">
+        <button id="btnGuardarLote" class="btn-importar" style="display: none;" onclick="guardarLoteHistorial()">💾 Guardar Historial Actual</button>
+        <button id="btnVerLotes" style="display: none;" onclick="abrirVentanaHistoriales()">📂 Ver Historiales Guardados</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Evolución de Estabilidad</h2>
+      <div class="canvas-container">
+        <canvas id="graficoEstabilidad" height="80"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Registro de Mediciones de Pantalla</h2>
+      
+      <div class="data-controls">
+        <button class="btn-accion" onclick="descargarGrafico()">Descargar Gráfica (PNG)</button>
+        <button class="btn-accion" onclick="exportarCSV()">Exportar CSV</button>
+        <label for="importarCSV" class="btn-accion btn-importar">Importar CSV</label>
+        <input type="file" id="importarCSV" accept=".csv" onchange="procesarCSV(event)" style="display: none;" />
+        <button class="btn-secundario" onclick="limpiarPantallaActual()">Limpiar Pantalla</button>
+      </div>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Latencia</th>
+              <th>Jitter</th>
+              <th>Velocidad</th>
+              <th>Análisis QoS</th>
+            </tr>
+          </thead>
+          <tbody id="tablaHistorial"></tbody>
+        </table>
+      </div>
     </section>
   </main>
 
