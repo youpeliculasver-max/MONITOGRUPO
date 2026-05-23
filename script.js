@@ -1,15 +1,15 @@
-// ==========================================
-// VELOCÍMETRO - SCRIPT COMPLETO
-// ==========================================
-
 // 1. Referencias al DOM
 const modalLogin = document.getElementById("loginModal");
 const inputUsuario = document.getElementById("inputUsuario");
+const inputPassword = document.getElementById("inputPassword");
 const usuarioActivoTexto = document.getElementById("usuarioActivo");
 const btnSalir = document.getElementById("btnSalir");
+const btnVerHistorial = document.getElementById("btnVerHistorial");
 const mainContent = document.getElementById("mainContent");
+const historialModal = document.getElementById("historialModal");
 
 const btnIniciar = document.getElementById("btnIniciar");
+const btnGuardar = document.getElementById("btnGuardar");
 const estadoPrueba = document.getElementById("estadoPrueba");
 const latenciaTexto = document.getElementById("latencia");
 const jitterTexto = document.getElementById("jitter");
@@ -20,14 +20,18 @@ const estadoRed = document.getElementById("estadoRed");
 const recomendacion = document.getElementById("recomendacion");
 const tablaHistorial = document.getElementById("tablaHistorial");
 
-// 2. Variables de Estado Globales
+// 2. Variables Globales
 let usuarioActual = null;
 let historial = [];
 let graficoEstabilidad = null; 
+let ultimaMedicion = null; // Guarda temporalmente la prueba antes de guardarla
 
-let baseDatosUsuarios = JSON.parse(localStorage.getItem("db_usuarios_teleqos")) || [];
+// Base de datos de usuarios (con contraseña)
+let baseDatosUsuarios = JSON.parse(localStorage.getItem("db_usuarios_v2")) || [];
 
-// 3. Gestión de Sesiones
+// ==========================================
+// SISTEMA DE SESIONES Y CONTRASEÑA
+// ==========================================
 function iniciarSesion(esUsuario) {
   if (!esUsuario) {
     usuarioActual = "Invitado";
@@ -37,25 +41,32 @@ function iniciarSesion(esUsuario) {
   }
 
   const nombre = inputUsuario.value.trim();
-  if (nombre === "") {
-    alert("Por favor, ingresa un nombre de usuario.");
+  const password = inputPassword.value.trim();
+
+  if (nombre === "" || password === "") {
+    alert("Por favor, ingresa un usuario y una contraseña.");
     return;
   }
 
-  const usuarioExiste = baseDatosUsuarios.includes(nombre);
+  const usuarioExiste = baseDatosUsuarios.find(u => u.nombre === nombre);
 
   if (usuarioExiste) {
-    usuarioActual = nombre;
-    cargarHistorialUsuario();
-    abrirDashboard();
+    if (usuarioExiste.password === password) {
+      usuarioActual = nombre;
+      cargarHistorialUsuario();
+      abrirDashboard();
+    } else {
+      alert("Contraseña incorrecta para el usuario " + nombre);
+    }
   } else {
-    const confirmar = confirm(`El usuario "${nombre}" no existe. ¿Deseas registrar este perfil?`);
+    const confirmar = confirm(`El usuario "${nombre}" no existe. ¿Deseas registrarte con esta contraseña?`);
     if (confirmar) {
-      baseDatosUsuarios.push(nombre);
-      localStorage.setItem("db_usuarios_teleqos", JSON.stringify(baseDatosUsuarios));
+      baseDatosUsuarios.push({ nombre: nombre, password: password });
+      localStorage.setItem("db_usuarios_v2", JSON.stringify(baseDatosUsuarios));
       usuarioActual = nombre;
       cargarHistorialUsuario(); 
       abrirDashboard();
+      alert("¡Registro exitoso!");
     }
   }
 }
@@ -71,189 +82,143 @@ function abrirDashboard() {
   
   if (usuarioActual !== "Invitado") {
     btnSalir.style.display = "inline-block";
+    btnVerHistorial.style.display = "inline-block";
   }
-  
-  actualizarTabla();
-  actualizarGrafico();
 }
 
 function cerrarSesion() {
   usuarioActual = null;
   historial = [];
   inputUsuario.value = "";
+  inputPassword.value = "";
   btnSalir.style.display = "none";
+  btnVerHistorial.style.display = "none";
   mainContent.style.display = "none";
+  btnGuardar.style.display = "none";
   modalLogin.style.display = "flex";
-  
+  cerrarHistorial();
+}
+
+// ==========================================
+// VENTANA FLOTANTE DEL HISTORIAL
+// ==========================================
+function abrirHistorial() {
+  historialModal.style.display = "flex";
+  actualizarTabla();
+  actualizarGrafico();
+}
+
+function cerrarHistorial() {
+  historialModal.style.display = "none";
   if (graficoEstabilidad) {
     graficoEstabilidad.destroy();
     graficoEstabilidad = null;
   }
 }
 
-// 4. Utilidades
-function actualizarEstado(mensaje) {
-  estadoPrueba.textContent = mensaje;
-}
+// ==========================================
+// MOTOR DE MEDICIÓN
+// ==========================================
+function actualizarEstado(mensaje) { estadoPrueba.textContent = mensaje; }
+function esperar(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-function esperar(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// 5. Motor de Latencia y Jitter
 async function medirLatencia() {
   const mediciones = [];
   const url = "https://www.gstatic.com/generate_204";
-
   for (let i = 0; i < 6; i++) {
     const inicio = performance.now();
     try {
-      await fetch(`${url}?nocache=${Date.now()}-${i}`, {
-        mode: "no-cors",
-        cache: "no-store"
-      });
-      const fin = performance.now();
-      const tiempo = fin - inicio;
-      mediciones.push(tiempo);
-    } catch (error) {
-      console.log("Error en paquete de latencia:", error);
-    }
+      await fetch(`${url}?nocache=${Date.now()}-${i}`, { mode: "no-cors", cache: "no-store" });
+      mediciones.push(performance.now() - inicio);
+    } catch (e) {}
     await esperar(300);
   }
-
-  if (mediciones.length === 0) {
-    throw new Error("Pérdida total de paquetes.");
-  }
-
-  const promedio = mediciones.reduce((suma, valor) => suma + valor, 0) / mediciones.length;
-  const jitter = calcularJitter(mediciones);
-
+  if (mediciones.length === 0) throw new Error("Falla de red");
+  const promedio = mediciones.reduce((a, b) => a + b, 0) / mediciones.length;
+  let dif = [];
+  for (let i = 1; i < mediciones.length; i++) dif.push(Math.abs(mediciones[i] - mediciones[i-1]));
+  const jitter = dif.length ? dif.reduce((a, b) => a + b, 0) / dif.length : 0;
   return { latencia: promedio, jitter: jitter };
 }
 
-function calcularJitter(mediciones) {
-  if (mediciones.length < 2) return 0;
-  let diferencias = [];
-  for (let i = 1; i < mediciones.length; i++) {
-    diferencias.push(Math.abs(mediciones[i] - mediciones[i - 1]));
-  }
-  return diferencias.reduce((suma, valor) => suma + valor, 0) / diferencias.length;
-}
-
-// 6. Motor de Velocidad (Payload 5MB)
 async function medirVelocidad() {
-  const bytes = 5000000; 
-  const url = `https://speed.cloudflare.com/__down?bytes=${bytes}&nocache=${Date.now()}`;
+  const url = `https://speed.cloudflare.com/__down?bytes=5000000&nocache=${Date.now()}`;
   const inicio = performance.now();
-
   try {
-    const respuesta = await fetch(url, { cache: "no-store" });
-    const blob = await respuesta.blob();
-    const fin = performance.now();
-
-    const segundos = (fin - inicio) / 1000;
-    const bitsDescargados = blob.size * 8;
-    const mbps = bitsDescargados / segundos / 1000000;
-    return mbps;
-  } catch (error) {
-    console.log("Error midiendo velocidad:", error);
-    if (navigator.connection && navigator.connection.downlink) {
-      return navigator.connection.downlink;
-    }
-    return 0;
-  }
+    const res = await fetch(url, { cache: "no-store" });
+    const blob = await res.blob();
+    return (blob.size * 8) / ((performance.now() - inicio) / 1000) / 1000000;
+  } catch (e) { return navigator.connection?.downlink || 0; }
 }
 
-// 7. Evaluación QoS Estricta
-function clasificarRed(latencia, jitter, velocidad) {
-  let puntos = 100;
+function clasificarRed(lat, jit, vel) {
+  let pts = 100;
+  if (lat > 100) pts -= 20; if (lat > 200) pts -= 30;
+  if (jit > 30) pts -= 20; if (jit > 50) pts -= 20;
+  if (vel < 10) pts -= 20; if (vel < 2) pts -= 30;
+  if (pts < 0) pts = 0;
 
-  if (latencia > 100) puntos -= 20;
-  if (latencia > 200) puntos -= 30;
-  if (jitter > 30) puntos -= 20;
-  if (jitter > 50) puntos -= 20;
-  if (velocidad < 10) puntos -= 20;
-  if (velocidad < 2) puntos -= 30;
-
-  if (puntos < 0) puntos = 0;
-
-  if (latencia < 100 && jitter < 30 && velocidad >= 10) {
-    return { estado: "Óptimo", color: "verde", recomendacion: "Enlace estable. Apto para VoIP y Streaming HD sin cortes.", calidad: puntos };
-  }
-  if (latencia <= 200 && jitter <= 50 && velocidad >= 2) {
-    return { estado: "Regular", color: "amarillo", recomendacion: "Enlace degradado. Posible retardo en aplicaciones en tiempo real.", calidad: puntos };
-  }
-  return { estado: "Crítico", color: "rojo", recomendacion: "Falla de QoS. Revisar cobertura de celda o saturación del medio.", calidad: puntos };
+  if (lat < 100 && jit < 30 && vel >= 10) return { estado: "Óptimo", color: "verde", rec: "Apto para VoIP y Streaming." };
+  if (lat <= 200 && jit <= 50 && vel >= 2) return { estado: "Regular", color: "amarillo", rec: "Posible retardo." };
+  return { estado: "Crítico", color: "rojo", rec: "Falla de QoS." };
 }
 
-// 8. Flujo Principal de Diagnóstico
 async function iniciarDiagnostico() {
-  btnIniciar.disabled = true;
-  btnIniciar.textContent = "Analizando Enlace...";
+  btnIniciar.disabled = true; 
+  btnGuardar.style.display = "none";
+  actualizarEstado("Midiendo latencia y jitter...");
+  semaforo.className = "semaforo gris";
 
   try {
-    actualizarEstado("Midiendo latencia y jitter...");
-    latenciaTexto.textContent = "-- ms";
-    jitterTexto.textContent = "-- ms";
-    velocidadTexto.textContent = "-- Mbps";
-    estadoRed.textContent = "Analizando...";
-    recomendacion.textContent = "Evaluando parámetros...";
-    semaforo.className = "semaforo gris";
+    const dLat = await medirLatencia();
+    actualizarEstado("Midiendo Throughput (5MB)...");
+    const vel = await medirVelocidad();
+    
+    const res = clasificarRed(dLat.latencia, dLat.jitter, vel);
 
-    const datosLatencia = await medirLatencia();
-    actualizarEstado("Midiendo Throughput (Payload 5MB)...");
-    const velocidad = await medirVelocidad();
-
-    const lat = datosLatencia.latencia;
-    const jit = datosLatencia.jitter;
-    const resultado = clasificarRed(lat, jit, velocidad);
-
-    latenciaTexto.textContent = `${lat.toFixed(1)} ms`;
-    jitterTexto.textContent = `${jit.toFixed(1)} ms`;
-    velocidadTexto.textContent = `${velocidad.toFixed(2)} Mbps`;
-
-    semaforo.className = `semaforo ${resultado.color}`;
-    estadoRed.textContent = resultado.estado;
-    recomendacion.textContent = resultado.recomendacion;
-
+    latenciaTexto.textContent = `${dLat.latencia.toFixed(1)} ms`;
+    jitterTexto.textContent = `${dLat.jitter.toFixed(1)} ms`;
+    velocidadTexto.textContent = `${vel.toFixed(2)} Mbps`;
+    semaforo.className = `semaforo ${res.color}`;
+    estadoRed.textContent = res.estado;
+    recomendacion.textContent = res.rec;
     actualizarEstado("Análisis finalizado.");
 
-    if (usuarioActual && usuarioActual !== "Invitado") {
-      guardarEnHistorial(lat, jit, velocidad, resultado.estado);
-    }
-  } catch (error) {
-    actualizarEstado("Error crítico en el enlace.");
-    estadoRed.textContent = "Falla de red";
-    semaforo.className = "semaforo rojo";
-    console.log(error);
+    // Guarda temporalmente la medición
+    ultimaMedicion = {
+      fecha: new Date().toLocaleString(),
+      latencia: dLat.latencia.toFixed(1),
+      jitter: dLat.jitter.toFixed(1),
+      velocidad: vel.toFixed(2),
+      estado: res.estado
+    };
+
+    // Muestra el botón de guardar SOLO si iniciaste sesión
+    if (usuarioActual !== "Invitado") btnGuardar.style.display = "inline-block";
+
+  } catch (e) {
+    actualizarEstado("Error crítico."); semaforo.className = "semaforo rojo";
   }
-  
   btnIniciar.disabled = false;
-  btnIniciar.textContent = "Iniciar Medición";
 }
 
-// 9. Historial y Almacenamiento
-function guardarEnHistorial(latencia, jitter, velocidad, estado) {
-  const prueba = {
-    fecha: new Date().toLocaleString(),
-    latencia: latencia.toFixed(1),
-    jitter: jitter.toFixed(1),
-    velocidad: velocidad.toFixed(2),
-    estado: estado
-  };
-
-  historial.unshift(prueba);
-  if (historial.length > 20) historial.pop();
-
+// ==========================================
+// GUARDAR PRUEBA Y EXPORTAR DATOS
+// ==========================================
+function guardarMedicionActual() {
+  if (!ultimaMedicion) return;
+  historial.unshift(ultimaMedicion);
+  if (historial.length > 50) historial.pop(); 
   localStorage.setItem(`historial_${usuarioActual}`, JSON.stringify(historial));
-  actualizarTabla();
-  actualizarGrafico();
+  
+  alert("¡Medición guardada correctamente en tu historial!");
+  btnGuardar.style.display = "none"; // Oculta para no guardar la misma prueba 2 veces
 }
 
 function actualizarTabla() {
   tablaHistorial.innerHTML = "";
   if (historial.length === 0) {
-    tablaHistorial.innerHTML = `<tr><td colspan="5">Sin registros en esta sesión.</td></tr>`;
+    tablaHistorial.innerHTML = `<tr><td colspan="5">Aún no has guardado mediciones.</td></tr>`;
     return;
   }
   historial.forEach(p => {
@@ -264,7 +229,7 @@ function actualizarTabla() {
 }
 
 function borrarHistorial() {
-  if (confirm(`¿Seguro que deseas borrar los datos del usuario ${usuarioActual}?`)) {
+  if (confirm(`¿Seguro que deseas borrar TODAS las mediciones guardadas de ${usuarioActual}?`)) {
     historial = [];
     localStorage.removeItem(`historial_${usuarioActual}`);
     actualizarTabla();
@@ -272,55 +237,53 @@ function borrarHistorial() {
   }
 }
 
-// 10. CSV y Gráficos (Chart.js)
 function exportarCSV() {
-  if (historial.length === 0) return alert("No hay datos para exportar.");
-  
+  if (historial.length === 0) return alert("No hay datos guardados.");
   let csv = "Fecha,Latencia(ms),Jitter(ms),Velocidad(Mbps),Estado\n";
-  historial.forEach(r => { 
-    csv += `${r.fecha},${r.latencia},${r.jitter},${r.velocidad},${r.estado}\n`; 
-  });
-  
+  historial.forEach(r => csv += `${r.fecha},${r.latencia},${r.jitter},${r.velocidad},${r.estado}\n`);
   const link = document.createElement("a");
   link.href = encodeURI("data:text/csv;charset=utf-8," + csv);
   link.download = `Reporte_QoS_${usuarioActual}.csv`;
-  document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
 }
 
 function procesarCSV(evento) {
   const archivo = evento.target.files[0];
   if (!archivo) return;
-  
   const lector = new FileReader();
   lector.onload = function(e) {
     const lineas = e.target.result.split("\n").slice(1); 
     const nuevosDatos = [];
-    
     lineas.forEach(linea => {
       if(linea.trim() === "") return;
       const cols = linea.split(",");
-      if(cols.length >= 5) {
-        nuevosDatos.push({ 
-          fecha: cols[0], latencia: cols[1], jitter: cols[2], 
-          velocidad: cols[3], estado: cols[4].trim() 
-        });
-      }
+      if(cols.length >= 5) nuevosDatos.push({ fecha: cols[0], latencia: cols[1], jitter: cols[2], velocidad: cols[3], estado: cols[4].trim() });
     });
-    
     if(nuevosDatos.length > 0) {
-      historial = nuevosDatos.concat(historial).slice(0, 20);
-      if (usuarioActual !== "Invitado") {
-        localStorage.setItem(`historial_${usuarioActual}`, JSON.stringify(historial));
-      }
-      actualizarTabla();
-      actualizarGrafico();
-      alert("CSV Importado y analizado con éxito.");
+      historial = nuevosDatos.concat(historial).slice(0, 50);
+      localStorage.setItem(`historial_${usuarioActual}`, JSON.stringify(historial));
+      actualizarTabla(); actualizarGrafico();
+      alert("CSV Importado correctamente.");
     }
   };
   lector.readAsText(archivo);
 }
+
+// ==========================================
+// GRÁFICO (CON EXPORTACIÓN A PNG)
+// ==========================================
+// Plugin para dar fondo oscuro a la imagen descargada (Chart.js v3/v4)
+const pluginFondoOscuro = {
+  id: 'customCanvasBackgroundColor',
+  beforeDraw: (chart, args, options) => {
+    const {ctx} = chart;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = options.color || '#0f172a';
+    ctx.fillRect(0, 0, chart.width, chart.height);
+    ctx.restore();
+  }
+};
 
 function actualizarGrafico() {
   const canvas = document.getElementById('graficoEstabilidad');
@@ -328,7 +291,8 @@ function actualizarGrafico() {
   const ctx = canvas.getContext('2d');
   
   if (graficoEstabilidad) graficoEstabilidad.destroy();
-  
+  if (historial.length === 0) return;
+
   const datosInvertidos = [...historial].reverse();
   const etiquetas = datosInvertidos.map(d => d.fecha.split(',')[1] || "");
   const latencias = datosInvertidos.map(d => parseFloat(d.latencia));
@@ -339,14 +303,8 @@ function actualizarGrafico() {
     data: {
       labels: etiquetas,
       datasets: [
-        { 
-          label: 'Latencia (ms)', data: latencias, borderColor: '#ef4444', 
-          backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.3, fill: true, yAxisID: 'y' 
-        },
-        { 
-          label: 'Velocidad (Mbps)', data: velocidades, borderColor: '#10b981', 
-          backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, fill: true, yAxisID: 'y1' 
-        }
+        { label: 'Latencia (ms)', data: latencias, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.2)', tension: 0.3, fill: true, yAxisID: 'y' },
+        { label: 'Velocidad (Mbps)', data: velocidades, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.2)', tension: 0.3, fill: true, yAxisID: 'y1' }
       ]
     },
     options: {
@@ -356,7 +314,21 @@ function actualizarGrafico() {
         y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'ms', color: '#94a3b8' } },
         y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Mbps', color: '#94a3b8' } }
       },
-      plugins: { legend: { labels: { color: '#f8fafc' } } }
-    }
+      plugins: { 
+        legend: { labels: { color: '#f8fafc' } },
+        customCanvasBackgroundColor: { color: '#0f172a' } 
+      }
+    },
+    plugins: [pluginFondoOscuro] // Aplica el fondo para descargar correctamente
   });
+}
+
+function descargarGrafico() {
+  if (historial.length === 0) return alert("No hay datos para graficar.");
+  const canvas = document.getElementById('graficoEstabilidad');
+  const imageURL = canvas.toDataURL("image/png"); 
+  const link = document.createElement("a");
+  link.href = imageURL;
+  link.download = `Grafico_Estabilidad_${usuarioActual}.png`;
+  link.click();
 }
