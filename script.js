@@ -1,41 +1,43 @@
-// 1. Referencias al DOM
+// ==========================================
+// VELOCÍMETRO - ARQUITECTURA ORIGINAL + LOTES DE HISTORIAL
+// ==========================================
+
 const modalLogin = document.getElementById("loginModal");
 const inputUsuario = document.getElementById("inputUsuario");
 const inputPassword = document.getElementById("inputPassword");
 const usuarioActivoTexto = document.getElementById("usuarioActivo");
 const btnSalir = document.getElementById("btnSalir");
-const btnVerHistorial = document.getElementById("btnVerHistorial");
 const mainContent = document.getElementById("mainContent");
-const historialModal = document.getElementById("historialModal");
+
+const modalListadoHistoriales = document.getElementById("modalListadoHistoriales");
+const contenedorListaHistoriales = document.getElementById("contenedorListaHistoriales");
 
 const btnIniciar = document.getElementById("btnIniciar");
-const btnGuardar = document.getElementById("btnGuardar");
+const btnGuardarLote = document.getElementById("btnGuardarLote");
+const btnVerLotes = document.getElementById("btnVerLotes");
+
 const estadoPrueba = document.getElementById("estadoPrueba");
 const latenciaTexto = document.getElementById("latencia");
 const jitterTexto = document.getElementById("jitter");
 const velocidadTexto = document.getElementById("velocidad");
-
 const semaforo = document.getElementById("semaforo");
 const estadoRed = document.getElementById("estadoRed");
 const recomendacion = document.getElementById("recomendacion");
 const tablaHistorial = document.getElementById("tablaHistorial");
 
-// 2. Variables Globales
+// --- VARIABLES DE ESTADO ---
 let usuarioActual = null;
-let historial = [];
+let medicionesActuales = []; // Lo que se muestra SIEMPRE en la tabla/gráfico principal
+let lotesGuardados = [];     // Los historiales guardados en la BD
 let graficoEstabilidad = null; 
-let ultimaMedicion = null; // Guarda temporalmente la prueba antes de guardarla
 
-// Base de datos de usuarios (con contraseña)
 let baseDatosUsuarios = JSON.parse(localStorage.getItem("db_usuarios_v2")) || [];
 
-// ==========================================
-// SISTEMA DE SESIONES Y CONTRASEÑA
-// ==========================================
+// --- 1. SISTEMA DE SESIONES ---
 function iniciarSesion(esUsuario) {
   if (!esUsuario) {
     usuarioActual = "Invitado";
-    historial = [];
+    medicionesActuales = [];
     abrirDashboard();
     return;
   }
@@ -43,36 +45,32 @@ function iniciarSesion(esUsuario) {
   const nombre = inputUsuario.value.trim();
   const password = inputPassword.value.trim();
 
-  if (nombre === "" || password === "") {
-    alert("Por favor, ingresa un usuario y una contraseña.");
-    return;
-  }
+  if (nombre === "" || password === "") return alert("Ingresa usuario y contraseña.");
 
   const usuarioExiste = baseDatosUsuarios.find(u => u.nombre === nombre);
 
   if (usuarioExiste) {
     if (usuarioExiste.password === password) {
       usuarioActual = nombre;
-      cargarHistorialUsuario();
+      cargarBaseDatosLotes();
       abrirDashboard();
     } else {
-      alert("Contraseña incorrecta para el usuario " + nombre);
+      alert("Contraseña incorrecta.");
     }
   } else {
-    const confirmar = confirm(`El usuario "${nombre}" no existe. ¿Deseas registrarte con esta contraseña?`);
+    const confirmar = confirm(`El usuario "${nombre}" no existe. ¿Registrar con esta contraseña?`);
     if (confirmar) {
       baseDatosUsuarios.push({ nombre: nombre, password: password });
       localStorage.setItem("db_usuarios_v2", JSON.stringify(baseDatosUsuarios));
       usuarioActual = nombre;
-      cargarHistorialUsuario(); 
+      cargarBaseDatosLotes(); 
       abrirDashboard();
-      alert("¡Registro exitoso!");
     }
   }
 }
 
-function cargarHistorialUsuario() {
-  historial = JSON.parse(localStorage.getItem(`historial_${usuarioActual}`)) || [];
+function cargarBaseDatosLotes() {
+  lotesGuardados = JSON.parse(localStorage.getItem(`lotes_${usuarioActual}`)) || [];
 }
 
 function abrirDashboard() {
@@ -82,43 +80,95 @@ function abrirDashboard() {
   
   if (usuarioActual !== "Invitado") {
     btnSalir.style.display = "inline-block";
-    btnVerHistorial.style.display = "inline-block";
+    btnGuardarLote.style.display = "inline-block";
+    btnVerLotes.style.display = "inline-block";
   }
-}
-
-function cerrarSesion() {
-  usuarioActual = null;
-  historial = [];
-  inputUsuario.value = "";
-  inputPassword.value = "";
-  btnSalir.style.display = "none";
-  btnVerHistorial.style.display = "none";
-  mainContent.style.display = "none";
-  btnGuardar.style.display = "none";
-  modalLogin.style.display = "flex";
-  cerrarHistorial();
-}
-
-// ==========================================
-// VENTANA FLOTANTE DEL HISTORIAL
-// ==========================================
-function abrirHistorial() {
-  historialModal.style.display = "flex";
   actualizarTabla();
   actualizarGrafico();
 }
 
-function cerrarHistorial() {
-  historialModal.style.display = "none";
-  if (graficoEstabilidad) {
-    graficoEstabilidad.destroy();
-    graficoEstabilidad = null;
+function cerrarSesion() {
+  usuarioActual = null;
+  medicionesActuales = [];
+  inputUsuario.value = ""; inputPassword.value = "";
+  btnSalir.style.display = "none";
+  btnGuardarLote.style.display = "none";
+  btnVerLotes.style.display = "none";
+  mainContent.style.display = "none";
+  modalLogin.style.display = "flex";
+  if (graficoEstabilidad) { graficoEstabilidad.destroy(); graficoEstabilidad = null; }
+}
+
+// --- 2. GESTIÓN DE LOTES (GUARDAR Y CARGAR HISTORIALES) ---
+function guardarLoteHistorial() {
+  if (medicionesActuales.length === 0) return alert("No hay mediciones en pantalla para guardar.");
+  
+  const nombreLote = prompt("Dale un nombre a este historial (Ej: Pruebas Piso 2, Madrugada...):", "Historial " + new Date().toLocaleDateString());
+  if (!nombreLote) return;
+
+  const nuevoLote = {
+    id: Date.now(),
+    nombre: nombreLote,
+    fecha: new Date().toLocaleString(),
+    datos: [...medicionesActuales] // Copia lo de la pantalla
+  };
+
+  lotesGuardados.unshift(nuevoLote);
+  localStorage.setItem(`lotes_${usuarioActual}`, JSON.stringify(lotesGuardados));
+  alert(`Historial "${nombreLote}" guardado con éxito.`);
+}
+
+function abrirVentanaHistoriales() {
+  contenedorListaHistoriales.innerHTML = "";
+  
+  if (lotesGuardados.length === 0) {
+    contenedorListaHistoriales.innerHTML = "<p>No tienes historiales guardados aún.</p>";
+  } else {
+    lotesGuardados.forEach(lote => {
+      const div = document.createElement("div");
+      div.className = "item-historial";
+      div.innerHTML = `
+        <div>
+          <h4>${lote.nombre}</h4>
+          <p>${lote.fecha} • ${lote.datos.length} mediciones</p>
+        </div>
+        <div>
+          <button class="btn-cargar" onclick="cargarLoteEnPantalla(${lote.id})">Cargar a Pantalla</button>
+          <button class="btn-eliminar-lote" onclick="eliminarLote(${lote.id})">X</button>
+        </div>
+      `;
+      contenedorListaHistoriales.appendChild(div);
+    });
+  }
+  
+  modalListadoHistoriales.style.display = "flex";
+}
+
+function cerrarVentanaHistoriales() {
+  modalListadoHistoriales.style.display = "none";
+}
+
+function cargarLoteEnPantalla(id) {
+  const lote = lotesGuardados.find(l => l.id === id);
+  if (lote) {
+    if(confirm(`¿Cargar el historial "${lote.nombre}" a la pantalla principal?`)) {
+      medicionesActuales = [...lote.datos];
+      actualizarTabla();
+      actualizarGrafico();
+      cerrarVentanaHistoriales();
+    }
   }
 }
 
-// ==========================================
-// MOTOR DE MEDICIÓN
-// ==========================================
+function eliminarLote(id) {
+  if(confirm("¿Seguro que deseas eliminar este historial guardado?")) {
+    lotesGuardados = lotesGuardados.filter(l => l.id !== id);
+    localStorage.setItem(`lotes_${usuarioActual}`, JSON.stringify(lotesGuardados));
+    abrirVentanaHistoriales(); // Refresca la lista
+  }
+}
+
+// --- 3. MOTOR DE MEDICIÓN ---
 function actualizarEstado(mensaje) { estadoPrueba.textContent = mensaje; }
 function esperar(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -164,8 +214,7 @@ function clasificarRed(lat, jit, vel) {
 }
 
 async function iniciarDiagnostico() {
-  btnIniciar.disabled = true; 
-  btnGuardar.style.display = "none";
+  btnIniciar.disabled = true;
   actualizarEstado("Midiendo latencia y jitter...");
   semaforo.className = "semaforo gris";
 
@@ -182,19 +231,20 @@ async function iniciarDiagnostico() {
     semaforo.className = `semaforo ${res.color}`;
     estadoRed.textContent = res.estado;
     recomendacion.textContent = res.rec;
-    actualizarEstado("Análisis finalizado.");
+    actualizarEstado("Medición terminada.");
 
-    // Guarda temporalmente la medición
-    ultimaMedicion = {
+    // Al terminar, se agrega directo a la tabla de la pantalla principal
+    medicionesActuales.unshift({
       fecha: new Date().toLocaleString(),
       latencia: dLat.latencia.toFixed(1),
       jitter: dLat.jitter.toFixed(1),
       velocidad: vel.toFixed(2),
       estado: res.estado
-    };
+    });
 
-    // Muestra el botón de guardar SOLO si iniciaste sesión
-    if (usuarioActual !== "Invitado") btnGuardar.style.display = "inline-block";
+    if (medicionesActuales.length > 50) medicionesActuales.pop();
+    actualizarTabla();
+    actualizarGrafico();
 
   } catch (e) {
     actualizarEstado("Error crítico."); semaforo.className = "semaforo rojo";
@@ -202,48 +252,35 @@ async function iniciarDiagnostico() {
   btnIniciar.disabled = false;
 }
 
-// ==========================================
-// GUARDAR PRUEBA Y EXPORTAR DATOS
-// ==========================================
-function guardarMedicionActual() {
-  if (!ultimaMedicion) return;
-  historial.unshift(ultimaMedicion);
-  if (historial.length > 50) historial.pop(); 
-  localStorage.setItem(`historial_${usuarioActual}`, JSON.stringify(historial));
-  
-  alert("¡Medición guardada correctamente en tu historial!");
-  btnGuardar.style.display = "none"; // Oculta para no guardar la misma prueba 2 veces
+// --- 4. EXPORTAR, IMPORTAR Y LIMPIAR PANTALLA PRINCIPAL ---
+function limpiarPantallaActual() {
+  if(confirm("¿Limpiar la pantalla? (Asegúrate de haber presionado 'Guardar Historial Actual' si quieres conservar los datos)")) {
+    medicionesActuales = [];
+    actualizarTabla();
+    actualizarGrafico();
+  }
 }
 
 function actualizarTabla() {
   tablaHistorial.innerHTML = "";
-  if (historial.length === 0) {
-    tablaHistorial.innerHTML = `<tr><td colspan="5">Aún no has guardado mediciones.</td></tr>`;
+  if (medicionesActuales.length === 0) {
+    tablaHistorial.innerHTML = `<tr><td colspan="5">Inicia una prueba o carga un historial para ver datos.</td></tr>`;
     return;
   }
-  historial.forEach(p => {
+  medicionesActuales.forEach(p => {
     const fila = document.createElement("tr");
     fila.innerHTML = `<td>${p.fecha}</td><td>${p.latencia} ms</td><td>${p.jitter} ms</td><td>${p.velocidad} Mbps</td><td>${p.estado}</td>`;
     tablaHistorial.appendChild(fila);
   });
 }
 
-function borrarHistorial() {
-  if (confirm(`¿Seguro que deseas borrar TODAS las mediciones guardadas de ${usuarioActual}?`)) {
-    historial = [];
-    localStorage.removeItem(`historial_${usuarioActual}`);
-    actualizarTabla();
-    actualizarGrafico();
-  }
-}
-
 function exportarCSV() {
-  if (historial.length === 0) return alert("No hay datos guardados.");
+  if (medicionesActuales.length === 0) return alert("No hay datos en pantalla.");
   let csv = "Fecha,Latencia(ms),Jitter(ms),Velocidad(Mbps),Estado\n";
-  historial.forEach(r => csv += `${r.fecha},${r.latencia},${r.jitter},${r.velocidad},${r.estado}\n`);
+  medicionesActuales.forEach(r => csv += `${r.fecha},${r.latencia},${r.jitter},${r.velocidad},${r.estado}\n`);
   const link = document.createElement("a");
   link.href = encodeURI("data:text/csv;charset=utf-8," + csv);
-  link.download = `Reporte_QoS_${usuarioActual}.csv`;
+  link.download = `Exportacion_${usuarioActual}.csv`;
   link.click();
 }
 
@@ -260,28 +297,22 @@ function procesarCSV(evento) {
       if(cols.length >= 5) nuevosDatos.push({ fecha: cols[0], latencia: cols[1], jitter: cols[2], velocidad: cols[3], estado: cols[4].trim() });
     });
     if(nuevosDatos.length > 0) {
-      historial = nuevosDatos.concat(historial).slice(0, 50);
-      localStorage.setItem(`historial_${usuarioActual}`, JSON.stringify(historial));
+      medicionesActuales = nuevosDatos.concat(medicionesActuales).slice(0, 50);
       actualizarTabla(); actualizarGrafico();
-      alert("CSV Importado correctamente.");
+      alert("CSV Importado a la pantalla principal.");
     }
   };
   lector.readAsText(archivo);
 }
 
-// ==========================================
-// GRÁFICO (CON EXPORTACIÓN A PNG)
-// ==========================================
-// Plugin para dar fondo oscuro a la imagen descargada (Chart.js v3/v4)
+// Plugin de fondo oscuro para PNG
 const pluginFondoOscuro = {
   id: 'customCanvasBackgroundColor',
   beforeDraw: (chart, args, options) => {
-    const {ctx} = chart;
-    ctx.save();
+    const {ctx} = chart; ctx.save();
     ctx.globalCompositeOperation = 'destination-over';
     ctx.fillStyle = options.color || '#0f172a';
-    ctx.fillRect(0, 0, chart.width, chart.height);
-    ctx.restore();
+    ctx.fillRect(0, 0, chart.width, chart.height); ctx.restore();
   }
 };
 
@@ -291,9 +322,9 @@ function actualizarGrafico() {
   const ctx = canvas.getContext('2d');
   
   if (graficoEstabilidad) graficoEstabilidad.destroy();
-  if (historial.length === 0) return;
+  if (medicionesActuales.length === 0) return;
 
-  const datosInvertidos = [...historial].reverse();
+  const datosInvertidos = [...medicionesActuales].reverse();
   const etiquetas = datosInvertidos.map(d => d.fecha.split(',')[1] || "");
   const latencias = datosInvertidos.map(d => parseFloat(d.latencia));
   const velocidades = datosInvertidos.map(d => parseFloat(d.velocidad));
@@ -319,16 +350,15 @@ function actualizarGrafico() {
         customCanvasBackgroundColor: { color: '#0f172a' } 
       }
     },
-    plugins: [pluginFondoOscuro] // Aplica el fondo para descargar correctamente
+    plugins: [pluginFondoOscuro]
   });
 }
 
 function descargarGrafico() {
-  if (historial.length === 0) return alert("No hay datos para graficar.");
+  if (medicionesActuales.length === 0) return alert("No hay datos en pantalla.");
   const canvas = document.getElementById('graficoEstabilidad');
-  const imageURL = canvas.toDataURL("image/png"); 
   const link = document.createElement("a");
-  link.href = imageURL;
-  link.download = `Grafico_Estabilidad_${usuarioActual}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.download = `Grafico_${usuarioActual}.png`;
   link.click();
 }
